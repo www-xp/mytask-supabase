@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>智能任务管理</title>
+<style>
+*{box-sizing:border-box;font-family:system-ui}
+body{max-width:600px;margin:30px auto;padding:0 15px}
+.add{display:flex;gap:8px;margin-bottom:15px}
+input,select,button{padding:8px;font-size:14px}
+.task{padding:10px;border:1px solid #ddd;border-radius:6px;margin:8px 0}
+.done{text-decoration:line-through;color:#888}
+.high{border-left:4px solid #f44336}
+.mid{border-left:4px solid #ff9800}
+.low{border-left:4px solid #4caf50}
+.filter{margin-bottom:12px}
+</style>
+</head>
+<body>
+<h2>任务清单</h2>
+<div class="add">
+<input id="title" placeholder="输入任务">
+<select id="level">
+<option value="high">高</option>
+<option value="mid">中</option>
+<option value="low">低</option>
+</select>
+<button onclick="addTask()">添加</button>
+</div>
+<div class="filter">
+<button onclick="loadAll()">全部</button>
+<button onclick="loadFilter('high')">高优先级</button>
+<button onclick="loadFilter('mid')">中优先级</button>
+<button onclick="loadFilter('low')">低优先级</button>
+</div>
+<div id="list"></div>
+
+<script>
+const supabaseUrl = "你的supabase地址";
+const supabaseKey = "你的anon密钥";
+const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+let nowFilter = null;
+
+async function render(){
+  let q = supabase.from("tasks").select("*").order("created_at",{ascending:false});
+  if(nowFilter) q = q.eq("level",nowFilter);
+  const {data} = await q;
+  let html = "";
+  data.forEach(t=>{
+    html += `<div class="task ${t.done?'done':''} ${t.level}">
+      <span>${t.title}</span>
+      <button onclick="toggle(${t.id},${!t.done})">✓</button>
+      <button onclick="del(${t.id})">×</button>
+    </div>`
+  })
+  document.getElementById("list").innerHTML = html;
+}
+
+async function addTask(){
+  const title = document.getElementById("title").value.trim();
+  const level = document.getElementById("level").value;
+  if(!title) return;
+  await supabase.from("tasks").insert([{title,level,done:false}]);
+  document.getElementById("title").value="";
+  render();
+}
+async function toggle(id,val){
+  await supabase.from("tasks").update({done:val}).eq("id",id);
+  render();
+}
+async function del(id){
+  await supabase.from("tasks").delete().eq("id",id);
+  render();
+}
+function loadAll(){nowFilter=null;render()}
+function loadFilter(v){nowFilter=v;render()}
+render();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</body>
+</html>
