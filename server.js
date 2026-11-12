@@ -1,46 +1,58 @@
-const express = require('express');
-const { createClient } = require('@supabase/supabase-js');
-const app = express();
-app.use(express.json());
-app.use(express.static('public'));
+require('dotenv').config()
+const express = require('express')
+const cors = require('cors')
+const { createClient } = require('@supabase/supabase-js')
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const app = express()
+app.use(cors())
+app.use(express.json())
+
+const supabaseUrl = process.env.SUPABASE_URL
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 app.get('/api/tasks', async (req, res) => {
   const { data, error } = await supabase
     .from('tasks')
     .select('*')
-    .order('created_at', { ascending: false });
-  res.json({ data, error });
-});
+    .order('created_at', { ascending: false })
+  if (error) return res.status(500).json({ error })
+  res.json({ data })
+})
 
 app.post('/api/tasks', async (req, res) => {
-  const { title, priority } = req.body;
+  const { title, priority } = req.body
   const { data, error } = await supabase
     .from('tasks')
-    .insert([{ title, priority, is_done: false }])
-    .select();
-  res.json({ data, error });
-});
+    .insert([{ title, priority, completed: false }])
+    .select()
+  if (error) return res.status(500).json({ error })
+  res.json({ data })
+})
 
 app.patch('/api/tasks/:id', async (req, res) => {
-  const { id } = req.params;
-  const { is_done } = req.body;
+  const { id } = req.params
+  const { completed } = req.body
   const { data, error } = await supabase
     .from('tasks')
-    .update({ is_done })
+    .update({ completed })
     .eq('id', id)
-    .select();
-  res.json({ data, error });
-});
+    .select()
+  if (error) return res.status(500).json({ error })
+  res.json({ data })
+})
 
 app.delete('/api/tasks/:id', async (req, res) => {
-  const { id } = req.params;
-  const { error } = await supabase.from('tasks').delete().eq('id', id);
-  res.json({ error });
-});
+  const { id } = req.params
+  const { error } = await supabase
+    .from('tasks')
+    .delete()
+    .eq('id', id)
+  if (error) return res.status(500).json({ error })
+  res.json({ ok: true })
+})
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`running on ${PORT}`));
+const port = process.env.PORT || 4000
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`)
+})
