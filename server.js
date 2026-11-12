@@ -1,265 +1,151 @@
-require('dotenv').config()
-const express = require('express')
-const cors = require('cors')
-const { createClient } = require('@supabase/supabase-js')
+import express from 'express';
+import cors from 'cors';
+import { createClient } from '@supabase/supabase-js';
 
-const app = express()
-app.use(cors())
-app.use(express.json())
+const app = express();
+app.use(cors());
+app.use(express.json());
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+
+let supabase;
+if (supabaseUrl && supabaseAnonKey) {
+  supabase = createClient(supabaseUrl, supabaseAnonKey);
+}
 
 app.get('/api/tasks', async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('*')
-      .order('created_at', { ascending: false })
-    if (error) throw error
-    res.json({ data })
-  } catch (e) {
-    res.status(500).json({ error: e.message })
-  }
-})
+  if (!supabase) return res.status(500).send('缺少 Supabase 环境变量');
+  const { data, error } = await supabase.from('tasks').select('*').order('id', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ data });
+});
 
 app.post('/api/tasks', async (req, res) => {
-  try {
-    const { title, priority } = req.body
-    const { data, error } = await supabase
-      .from('tasks')
-      .insert([{ title, priority, completed: false }])
-      .select()
-    if (error) throw error
-    res.json({ data })
-  } catch (e) {
-    res.status(500).json({ error: e.message })
-  }
-})
+  if (!supabase) return res.status(500).send('缺少 Supabase 环境变量');
+  const { title, priority } = req.body;
+  const { data, error } = await supabase.from('tasks').insert([{ title, priority, completed: false }]).select();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ data });
+});
 
 app.patch('/api/tasks/:id', async (req, res) => {
-  try {
-    const { id } = req.params
-    const { completed } = req.body
-    const { data, error } = await supabase
-      .from('tasks')
-      .update({ completed })
-      .eq('id', id)
-      .select()
-    if (error) throw error
-    res.json({ data })
-  } catch (e) {
-    res.status(500).json({ error: e.message })
-  }
-})
+  if (!supabase) return res.status(500).send('缺少 Supabase 环境变量');
+  const { id } = req.params;
+  const { completed } = req.body;
+  const { data, error } = await supabase.from('tasks').update({ completed }).eq('id', id).select();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ data });
+});
 
 app.delete('/api/tasks/:id', async (req, res) => {
-  try {
-    const { id } = req.params
-    const { error } = await supabase
-      .from('tasks')
-      .delete()
-      .eq('id', id)
-    if (error) throw error
-    res.json({ ok: true })
-  } catch (e) {
-    res.status(500).json({ error: e.message })
-  }
-})
+  if (!supabase) return res.status(500).send('缺少 Supabase 环境变量');
+  const { id } = req.params;
+  const { error } = await supabase.from('tasks').delete().eq('id', id);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ ok: true });
+});
 
 app.get('/', (req, res) => {
+  if (!supabase) {
+    return res.send(`
+      <h2>环境变量读取失败</h2>
+      <p>检查 SUPABASE_URL、SUPABASE_ANON_KEY</p>
+    `);
+  }
   res.send(`
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>任务清单</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: "Microsoft Yahei", sans-serif;
-    }
-    body {
-      background-color: #f4f7fa;
-      padding: 40px 20px;
-    }
-    .container {
-      max-width: 640px;
-      margin: 0 auto;
-      background: #fff;
-      border-radius: 16px;
-      padding: 32px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-    }
-    h3 {
-      text-align: center;
-      color: #1f2937;
-      margin-bottom: 24px;
-      font-size: 26px;
-    }
-    .add-area {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-bottom: 24px;
-    }
-    #taskInput {
-      flex: 1;
-      min-width: 200px;
-      padding: 12px 14px;
-      border: 1px solid #d1d5db;
-      border-radius: 10px;
-      font-size: 16px;
-      outline: none;
-    }
-    #prioritySelect {
-      padding: 12px 14px;
-      border: 1px solid #d1d5db;
-      border-radius: 10px;
-      font-size: 16px;
-      background: white;
-    }
-    #addBtn {
-      padding: 12px 22px;
-      background-color: #3b82f6;
-      color: white;
-      border: none;
-      border-radius: 10px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    .task-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 14px 16px;
-      border: 1px solid #e5e7eb;
-      border-radius: 12px;
-      margin-bottom: 12px;
-      background: #fafafa;
-    }
-    .task-title {
-      font-size: 16px;
-      color: #111827;
-    }
-    .task-title.done {
-      text-decoration: line-through;
-      color: #9ca3af;
-    }
-    .priority-tag {
-      display: inline-block;
-      margin-top: 6px;
-      padding: 3px 10px;
-      border-radius: 6px;
-      font-size: 13px;
-    }
-    .priority-高 { background: #fee2e2; color: #dc2626; }
-    .priority-中 { background: #fef3c7; color: #d97706; }
-    .priority-低 { background: #dcfce7; color: #16a34a; }
-    .task-actions {
-      display: flex;
-      gap: 8px;
-    }
-    .toggle-btn {
-      padding: 8px 14px;
-      background-color: #10b981;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-    .delete-btn {
-      padding: 8px 14px;
-      background-color: #ef4444;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>任务清单</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:Microsoft Yahei}
+body{background:#f4f7fa;padding:40px 20px}
+.box{max-width:640px;margin:0 auto;background:#fff;border-radius:16px;padding:32px;box-shadow:0 10px 30px rgba(0,0,0,0.08)}
+h3{text-align:center;margin-bottom:24px;color:#1f2937;font-size:22px}
+.bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px}
+input{flex:1;min-width:180px;padding:12px 14px;border:1px solid #d1d5db;border-radius:10px;font-size:16px}
+select{padding:12px 14px;border:1px solid #d1d5db;border-radius:10px;font-size:16px}
+button.add{padding:12px 22px;background:#3b82f6;color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:16px}
+.item{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border:1px solid #e5e7eb;border-radius:12px;margin-bottom:12px}
+.title{font-size:16px;color:#111}
+.done{text-decoration:line-through;color:#9ca3af}
+.tag{padding:4px 10px;border-radius:999px;font-size:13px}
+.tag-高{background:#fee2e2;color:#dc2626}
+.tag-中{background:#fef3c7;color:#d97706}
+.tag-低{background:#dcfce7;color:#16a34a}
+.btns{display:flex;gap:8px}
+.btns button{padding:8px 12px;border:none;border-radius:8px;cursor:pointer;font-size:14px}
+.ok{background:#10b981;color:#fff}
+.del{background:#ef4444;color:#fff}
+</style>
 </head>
 <body>
-  <div class="container">
-    <h3>任务清单</h3>
-    <div class="add-area">
-      <input id="taskInput" placeholder="输入任务">
-      <select id="prioritySelect">
-        <option value="高">高</option>
-        <option value="中" selected>中</option>
-        <option value="低">低</option>
-      </select>
-      <button id="addBtn">新增</button>
-    </div>
-    <div id="taskList"></div>
+<div class="box">
+  <h3>任务清单</h3>
+  <div class="bar">
+    <input id="inp" placeholder="输入任务">
+    <select id="sel">
+      <option value="高">高</option>
+      <option value="中" selected>中</option>
+      <option value="低">低</option>
+    </select>
+    <button class="add" id="addBtn">新增</button>
   </div>
+  <div id="list"></div>
+</div>
+<script>
+const inp=document.getElementById('inp');
+const sel=document.getElementById('sel');
+const addBtn=document.getElementById('addBtn');
+const list=document.getElementById('list');
 
-  <script>
-    const taskInput = document.getElementById('taskInput')
-    const prioritySelect = document.getElementById('prioritySelect')
-    const addBtn = document.getElementById('addBtn')
-    const taskList = document.getElementById('taskList')
-
-    async function loadTasks() {
-      const res = await fetch('/api/tasks')
-      const { data } = await res.json()
-      render(data)
-    }
-
-    function render(list) {
-      taskList.innerHTML = ''
-      if (!list) return
-      list.forEach(item => {
-        const div = document.createElement('div')
-        div.className = 'task-item'
-        div.innerHTML = `
-          <div class="task-content">
-            <div class="task-title ${item.completed ? 'done' : ''}">${item.title}</div>
-            <span class="priority-tag priority-${item.priority}">${item.priority}</span>
-          </div>
-          <div class="task-actions">
-            <button class="toggle-btn">${item.completed ? '未完成' : '完成'}</button>
-            <button class="delete-btn">删除</button>
-          </div>
-        `
-        div.querySelector('.toggle-btn').onclick = async () => {
-          await fetch(`/api/tasks/${item.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ completed: !item.completed })
-          })
-          loadTasks()
-        }
-        div.querySelector('.delete-btn').onclick = async () => {
-          await fetch(`/api/tasks/${item.id}`, { method: 'DELETE' })
-          loadTasks()
-        }
-        taskList.appendChild(div)
-      })
-    }
-
-    addBtn.onclick = async () => {
-      const title = taskInput.value.trim()
-      if (!title) return
-      await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, priority: prioritySelect.value })
-      })
-      taskInput.value = ''
-      loadTasks()
-    }
-    loadTasks()
-  </script>
+async function refresh(){
+  const res=await fetch('/api/tasks');
+  const {data}=await res.json();
+  list.innerHTML='';
+  if(!data) return;
+  data.forEach(t=>{
+    const div=document.createElement('div');
+    div.className='item';
+    div.innerHTML=`
+      <div>
+        <div class="title ${t.completed?'done':''}">${t.title}</div>
+        <span class="tag tag-${t.priority}">${t.priority}</span>
+      </div>
+      <div class="btns">
+        <button class="ok">${t.completed?'未完成':'完成'}</button>
+        <button class="del">删除</button>
+      </div>
+    `;
+    div.querySelector('.ok').onclick=async ()=>{
+      await fetch(\`/api/tasks/\${t.id}\`,{method:'PATCH',body:JSON.stringify({completed:!t.completed}),headers:{'Content-Type':'application/json'}});
+      refresh();
+    };
+    div.querySelector('.del').onclick=async ()=>{
+      await fetch(\`/api/tasks/\${t.id}\`,{method:'DELETE'});
+      refresh();
+    };
+    list.appendChild(div);
+  })
+}
+addBtn.onclick=async ()=>{
+  const title=inp.value.trim();
+  if(!title) return;
+  await fetch('/api/tasks',{method:'POST',body:JSON.stringify({title,priority:sel.value}),headers:{'Content-Type':'application/json'}});
+  inp.value='';
+  refresh();
+};
+refresh();
+</script>
 </body>
 </html>
-  `)
-})
+    `);
+});
 
-const port = process.env.PORT || 4000
+const port = process.env.PORT || 3000;
 app.listen(port, () => {
-  console.log(`服务启动成功`)
-})
+  console.log(`running on port ${port}`);
+});
